@@ -11,45 +11,58 @@ const openRouterModel = 'google/gemini-pro-vision';
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-async function analyzeImageWithOpenRouter(imageUrl, apiKey, model, messageHistory, userGoal, dailyCaloriesGoal) {
+async function analyzeImageWithOpenRouter(imageData, apiKey, model, messageHistory, userGoal, dailyCaloriesGoal) {
     try {
         const messages = [
             {
                 role: 'user',
-                content: `You are a food analysis expert. Analyze the image at this URL: ${imageUrl}.
-                
-                Provide your analysis in JSON format, with the following structure:
+                content: [
+                    {
+                        type: "text",
+                        text: `You are a food analysis expert. Analyze the meal in the attached image.
 
-                {
-                  "foods": ["food1", "food2", ...],  // List of detected food items, or an empty array if none.
-                  "totalCalories": "estimated total calories", // String, e.g., "550-650"
-                  "nutrients": {
-                    "protein": "estimated protein (g)",
-                    "carbs": "estimated carbs (g)",
-                    "fat": "estimated fat (g)"
-                  },
-                  "analysisSummary": "Brief summary of the meal's nutritional profile.",
-                  "recommendation": "Recommendation based on user's goal and calorie goal."
-                }
+                        Provide your analysis in JSON format, with the following structure:
 
-                If NO food items are detected, return:
+                        {
+                          "foods": ["food1", "food2", ...],
+                          "totalCalories": "estimated total calories",
+                          "nutrients": {
+                            "protein": "estimated protein (g)",
+                            "carbs": "estimated carbs (g)",
+                            "fat": "estimated fat (g)"
+                          },
+                          "analysisSummary": "Brief summary of the meal's nutritional profile.",
+                          "recommendation": "Recommendation based on user's goal and calorie goal."
+                        }
 
-                {
-                  "foods": [],
-                  "totalCalories": "N/A",
-                  "nutrients": {
-                    "protein": "N/A",
-                    "carbs": "N/A",
-                    "fat": "N/A"
-                  },
-                  "analysisSummary": "No food items detected in the image.",
-                  "recommendation": ""
-                }
-                
-                The user's goal is ${userGoal} and the daily calorie goal is ${dailyCaloriesGoal}.
-                `,
+                        If NO food items are detected, return:
+
+                        {
+                          "foods": [],
+                          "totalCalories": "N/A",
+                          "nutrients": {
+                            "protein": "N/A",
+                            "carbs": "N/A",
+                            "fat": "N/A"
+                          },
+                          "analysisSummary": "No food items detected in the image.",
+                          "recommendation": ""
+                        }
+
+                        The user's goal is ${userGoal} and the daily calorie goal is ${dailyCaloriesGoal}.`
+                    },
+                    {
+                        type: "image_url",
+                        image_url: {
+                            "url": imageData, // Pass the base64 data URL directly
+                        },
+                    },
+                ],
             },
-            ...messageHistory,
+            ...messageHistory.map(msg => ({ // Format previous messages correctly
+                role: msg.role,
+                content: [{ type: "text", text: msg.content }],
+            })),
         ];
 
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -59,7 +72,7 @@ async function analyzeImageWithOpenRouter(imageUrl, apiKey, model, messageHistor
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                model: model,
+                model: openRouterModel,
                 messages: messages,
             }),
         });
@@ -71,13 +84,12 @@ async function analyzeImageWithOpenRouter(imageUrl, apiKey, model, messageHistor
         const data = await response.json();
         const analysisText = data.choices[0].message.content;
 
-        // Attempt to parse as JSON
         try {
             const parsedAnalysis = JSON.parse(analysisText);
-            return parsedAnalysis; // Return the parsed object
+            return parsedAnalysis;
         } catch (parseError) {
             console.error("Error parsing AI response as JSON:", parseError);
-            console.log("Raw AI response:", analysisText); // Log the raw response
+            console.log("Raw AI response:", analysisText);
             throw new Error("Failed to parse AI response as JSON.");
         }
 
@@ -190,7 +202,8 @@ function App() {
         canvas.height = videoRef.current.videoHeight;
         canvas.getContext('2d').drawImage(videoRef.current, 0, 0);
         const dataUrl = canvas.toDataURL('image/jpeg');
-        setImageData(dataUrl);
+        setImageData(dataUrl); // Keep this, we'll use it for the API call
+        
 
         try {
             const fileName = `meal_${Date.now()}.jpg`;
@@ -214,17 +227,18 @@ function App() {
 
             const { data: publicUrlData } = supabase.storage.from('meal-images').getPublicUrl(data.path);
             const imageUrl = publicUrlData.publicUrl;
-            setImagePreviewUrl(imageUrl);
+            setImagePreviewUrl(imageUrl); // Keep using Supabase URL for preview
 
-            const analysis = await analyzeImageWithOpenRouter(imageUrl, openRouterApiKey, openRouterModel, [], userGoal, dailyCaloriesGoal); // Pass userGoal and dailyCaloriesGoal
+            // Call analyzeImageWithOpenRouter with the base64 data URL
+            const analysis = await analyzeImageWithOpenRouter(dataUrl, openRouterApiKey, openRouterModel, [], userGoal, dailyCaloriesGoal);
             setAnalysisResult(analysis);
-            setMessageHistory([{ role: 'assistant', content: JSON.stringify(analysis) }]); // Store as stringified JSON
+            setMessageHistory([{ role: 'assistant', content: JSON.stringify(analysis) }]);
 
 
             const { error: insertError } = await supabase.from('meals').insert([
                 {
                     image_url: imageUrl,
-                    analysis: JSON.stringify(analysis), // Store as stringified JSON
+                    analysis: JSON.stringify(analysis),
                     user_goal: userGoal,
                     daily_calories_goal: dailyCaloriesGoal,
                 },
@@ -289,15 +303,16 @@ function App() {
         setMessageHistory(updatedMessageHistory);
 
         try {
+            // For follow-up questions, we're still sending the base64 image data
             const response = await analyzeImageWithOpenRouter(
-                imagePreviewUrl,
+                imageData, // Use imageData (base64)
                 openRouterApiKey,
                 openRouterModel,
                 updatedMessageHistory,
-                userGoal,       // Pass userGoal
-                dailyCaloriesGoal // Pass dailyCaloriesGoal
+                userGoal,
+                dailyCaloriesGoal
             );
-            setMessageHistory([...updatedMessageHistory, { role: 'assistant', content: JSON.stringify(response) }]); // Store as stringified JSON
+            setMessageHistory([...updatedMessageHistory, { role: 'assistant', content: JSON.stringify(response) }]);
             setUserQuestion('');
         } catch (err) {
             console.error('Error asking question:', err);
@@ -314,9 +329,25 @@ function App() {
             setIsTyping(false);
         }
     };
+     const getRecommendation = (analysis, goal, calorieGoal) => {
+        if (!analysis) return "No analysis available.";
+          const parsedAnalysis = typeof analysis === 'string' ? analysis.split('\n').find(part => part.includes('total calories'))?.split(': ')[1] : null;
 
-    // No longer needed, as recommendation is part of the JSON
-    // const getRecommendation = (analysis, goal, calorieGoal) => { ... };
+        if (goal === "lose weight") {
+             if (parsedAnalysis && parseInt(parsedAnalysis) > calorieGoal / 3) {
+                return "This meal seems a bit high in calories for your weight loss goal. Consider reducing portion sizes or choosing lower-calorie options.";
+            } else {
+                return "This meal seems to be within your calorie goals for weight loss.";
+            }
+        } else if (goal === "gain muscle") {
+            return "Make sure to get enough protein! Consider adding more protein sources to your diet.";
+        } else {
+            return "Try to maintain a balanced diet with a variety of nutrients.";
+        }
+    };
+
+  const recommendation = getRecommendation(analysisResult, userGoal, dailyCaloriesGoal);
+
 
     const toggleFacingMode = () => {
         setFacingMode(prevMode => (prevMode === 'user' ? 'environment' : 'user'));
@@ -383,7 +414,7 @@ function App() {
                     {error && <p className="error-message">Error: {error}</p>}
                     {analysisResult && (
                         <>
-                            <MealAnalysisDisplay analysis={JSON.stringify(analysisResult)} /> {/* Pass as stringified JSON */}
+                            <MealAnalysisDisplay analysis={JSON.stringify(analysisResult)} />
                             <div className="recommendation">
                                 <strong>Recommendation:</strong> {analysisResult.recommendation}
                             </div>
@@ -423,7 +454,7 @@ function App() {
                             <li key={meal.id} className="meal-item">
                                 <img src={meal.image_url} alt="Meal" />
                                 <div className="meal-details">
-                                    <MealAnalysisDisplay analysis={meal.analysis} /> {/* Already stringified */}
+                                    <MealAnalysisDisplay analysis={meal.analysis} />
                                     <p><strong>User Goal:</strong> {meal.user_goal}</p>
                                     <p><strong>Daily Calorie Goal:</strong> {meal.daily_calories_goal}</p>
                                 </div>
