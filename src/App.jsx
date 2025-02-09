@@ -22,33 +22,17 @@ async function analyzeImageWithOpenRouter(imageData, apiKey, model, messageHisto
                         type: "text",
                         text: `You are a food analysis expert. Analyze the meal in the attached image.
 
-                        Provide your analysis in JSON format, with the following structure:
+                        Provide your analysis in a user-friendly format.
 
-                        {
-                          "foods": ["food1", "food2", ...],
-                          "totalCalories": "estimated total calories",
-                          "nutrients": {
-                            "protein": "estimated protein (g)",
-                            "carbs": "estimated carbs (g)",
-                            "fat": "estimated fat (g)"
-                          },
-                          "analysisSummary": "Brief summary of the meal's nutritional profile.",
-                          "recommendation": "Recommendation based on user's goal and calorie goal."
-                        }
+                        Include the following information:
 
-                        If NO food items are detected, return:
+                        - List of detected foods
+                        - Estimated total calories
+                        - Nutritional breakdown (protein, carbs, fat)
+                        - A brief summary of the meal's nutritional profile
+                        - A recommendation based on the user's goal and calorie goal
 
-                        {
-                          "foods": [],
-                          "totalCalories": "N/A",
-                          "nutrients": {
-                            "protein": "N/A",
-                            "carbs": "N/A",
-                            "fat": "N/A"
-                          },
-                          "analysisSummary": "No food items detected in the image.",
-                          "recommendation": ""
-                        }
+                        If no food items are detected, state that no food items were detected.
 
                         The user's goal is ${userGoal} and the daily calorie goal is ${dailyCaloriesGoal}.`
                     },
@@ -83,16 +67,7 @@ async function analyzeImageWithOpenRouter(imageData, apiKey, model, messageHisto
         }
 
         const data = await response.json();
-        const analysisText = data.choices[0].message.content;
-
-        try {
-            const parsedAnalysis = JSON.parse(analysisText);
-            return parsedAnalysis;
-        } catch (parseError) {
-            console.error("Error parsing AI response as JSON:", parseError);
-            console.log("Raw AI response:", analysisText);
-            throw new Error("Failed to parse AI response as JSON.");
-        }
+        return data.choices[0].message.content;
 
     } catch (err) {
         console.error('Error analyzing image:', err);
@@ -214,7 +189,7 @@ function App() {
         canvas.getContext('2d').drawImage(videoRef.current, 0, 0);
         const dataUrl = canvas.toDataURL('image/jpeg');
         setImageData(dataUrl); // Keep this, we'll use it for the API call
-        
+        setImagePreviewUrl(dataUrl);
 
         try {
             const fileName = `meal_${Date.now()}.jpg`;
@@ -238,18 +213,17 @@ function App() {
 
             const { data: publicUrlData } = supabase.storage.from('meal-images').getPublicUrl(data.path);
             const imageUrl = publicUrlData.publicUrl;
-            setImagePreviewUrl(imageUrl); // Keep using Supabase URL for preview
 
             // Call analyzeImageWithOpenRouter with the base64 data URL
             const analysis = await analyzeImageWithOpenRouter(dataUrl, openRouterApiKey, openRouterModel, [], userGoal, dailyCaloriesGoal);
             setAnalysisResult(analysis);
-            setMessageHistory([{ role: 'assistant', content: JSON.stringify(analysis) }]);
+            setMessageHistory([{ role: 'assistant', content: analysis }]);
 
 
             const { error: insertError } = await supabase.from('meals').insert([
                 {
                     image_url: imageUrl,
-                    analysis: JSON.stringify(analysis),
+                    analysis: analysis,
                     user_goal: userGoal,
                     daily_calories_goal: dailyCaloriesGoal,
                 },
@@ -323,7 +297,7 @@ function App() {
                 userGoal,
                 dailyCaloriesGoal
             );
-            setMessageHistory([...updatedMessageHistory, { role: 'assistant', content: JSON.stringify(response) }]);
+            setMessageHistory([...updatedMessageHistory, { role: 'assistant', content: response }]);
             setUserQuestion('');
         } catch (err) {
             console.error('Error asking question:', err);
@@ -429,9 +403,9 @@ function App() {
                     {error && <p className="error-message">Error: {error}</p>}
                     {analysisResult && (
                         <>
-                            <MealAnalysisDisplay analysis={JSON.stringify(analysisResult)} />
+                            <p>{analysisResult}</p>
                             <div className="recommendation">
-                                <strong>Recommendation:</strong> {analysisResult.recommendation}
+                                <strong>Recommendation:</strong> {recommendation}
                             </div>
 
                         </>
@@ -469,7 +443,7 @@ function App() {
                             <li key={meal.id} className="meal-item">
                                 <img src={meal.image_url} alt="Meal" />
                                 <div className="meal-details">
-                                    <MealAnalysisDisplay analysis={meal.analysis} />
+                                    <p>{meal.analysis}</p>
                                     <p><strong>User Goal:</strong> {meal.user_goal}</p>
                                     <p><strong>Daily Calorie Goal:</strong> {meal.daily_calories_goal}</p>
                                 </div>
