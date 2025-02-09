@@ -193,28 +193,6 @@ import React, { useState, useEffect, useRef } from 'react';
         setImagePreviewUrl(dataUrl);
 
         try {
-          const fileName = `meal_${Date.now()}.jpg`;
-          const contentType = 'image/jpeg';
-          const response = await fetch(dataUrl);
-          const blob = await response.blob();
-
-          let { data, error } = await supabase.storage
-            .from('meal-images')
-            .upload(fileName, blob, {
-              contentType: contentType,
-              upsert: false,
-            });
-
-          if (error) {
-            console.error('Error uploading image:', error);
-            setError(`Error uploading image: ${error.message}`);
-            setLoading(false);
-            return;
-          }
-
-          const { data: publicUrlData } = supabase.storage.from('meal-images').getPublicUrl(data.path);
-          const imageUrl = publicUrlData.publicUrl;
-
           // Call analyzeImageWithOpenRouter with the base64 data URL
           const analysis = await analyzeImageWithOpenRouter(dataUrl, openRouterApiKey, openRouterModel, [], userGoal, dailyCaloriesGoal);
           setAnalysisResult(analysis);
@@ -226,7 +204,7 @@ import React, { useState, useEffect, useRef } from 'react';
 
             const { error: insertError } = await supabase.from('meals').insert([
               {
-                image_url: imageUrl,
+                image_url: dataUrl, // Store base64 image data
                 analysis: analysis,
                 user_goal: userGoal,
                 daily_calories_goal: dailyCaloriesGoal,
@@ -485,12 +463,12 @@ import React, { useState, useEffect, useRef } from 'react';
         }
       };
 
-      const getRecommendation = (analysis, goal, calorieGoal) => {
+      const getRecommendation = (analysis, goal, dailyCaloriesGoal) => {
         if (!analysis) return "No analysis available.";
         const parsedAnalysis = typeof analysis === 'string' ? analysis.split('\n').find(part => part.includes('total calories'))?.split(': ')[1] : null;
 
         if (goal === "lose weight") {
-          if (parsedAnalysis && parseInt(parsedAnalysis) > calorieGoal / 3) {
+          if (parsedAnalysis && parseInt(parsedAnalysis) > dailyCaloriesGoal / 3) {
             return "This meal seems a bit high in calories for your weight loss goal. Consider reducing portion sizes or choosing lower-calorie options.";
           } else {
             return "This meal seems to be within your calorie goals for weight loss.";
