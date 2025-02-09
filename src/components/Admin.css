@@ -1,0 +1,18 @@
+.admin-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+    text-align: center;
+}
+
+.admin-container h2 {
+    color: var(--primary-color);
+}
+
+.admin-container form {
+    margin-bottom: 20px;
+}
+
+.admin-container input[type="password"] {
+    margin-right: 10px;
+}
