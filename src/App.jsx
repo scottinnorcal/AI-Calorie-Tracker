@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useSpring, animated } from 'react-spring';
-import { Link } from 'react-router-dom'; // Import Link
+import { Link, useNavigate } from 'react-router-dom'; // Import useNavigate
 import './App.css';
 import MealAnalysisDisplay from './components/MealAnalysisDisplay';
 
 const supabaseUrl = 'https://nouhhtzpulljacpjbwtz.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vdWhodHpwdWxsamFjcGpid3R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzkwNTE4NDksImV4cCI6MjA1NDYyNzg0OX0.mQUupVWxQRMErliyEwD9JFfRCMNz3gbm76rk9l6wdy4';
-const openRouterModel = 'google/gemini-2.0-flash-lite-preview-02-05:free'; // Default Model
+const openRouterModel = 'google/gemini-2.0-flash-lite-preview-02-05:free';
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -41,7 +41,7 @@ async function analyzeImageWithOpenRouter(imageUrl, apiKey, model, messageHistor
         return data.choices[0].message.content;
     } catch (err) {
         console.error('Error analyzing image:', err);
-        throw err;
+        throw err; // Re-throw to handle in calling function
     }
 }
 
@@ -61,6 +61,7 @@ function App() {
     const [openRouterApiKey, setOpenRouterApiKey] = useState('');
 
     const videoRef = useRef(null);
+    const navigate = useNavigate(); // Get the navigate function
 
     const fadeIn = useSpring({ opacity: 1, from: { opacity: 0 }, delay: 200 });
     const imagePreviewSpring = useSpring({
@@ -70,9 +71,14 @@ function App() {
     });
 
     useEffect(() => {
-        // Load API key from localStorage
         const storedApiKey = localStorage.getItem('openRouterApiKey');
-        setOpenRouterApiKey(storedApiKey || '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'); // Use stored key or default
+        if (storedApiKey) {
+            setOpenRouterApiKey(storedApiKey);
+        } else {
+            // Redirect to admin if no API key is found
+            navigate('/admin');
+            return; // Stop further execution in this useEffect
+        }
 
         const fetchMeals = async () => {
             try {
@@ -122,11 +128,17 @@ function App() {
                 tracks.forEach((track) => track.stop());
             }
         };
-    }, [facingMode]);
+    }, [facingMode, navigate]); // Add navigate to dependency array
 
 
 
     const handleCapture = async () => {
+        if (!openRouterApiKey) {
+            setError("API Key is missing. Please set it in the admin panel.");
+            navigate('/admin'); // Redirect to admin
+            return;
+        }
+
         setLoading(true);
         setError(null);
         setMessageHistory([]);
@@ -163,7 +175,7 @@ function App() {
             const imageUrl = publicUrlData.publicUrl;
             setImagePreviewUrl(imageUrl);
 
-            const analysis = await analyzeImageWithOpenRouter(imageUrl, openRouterApiKey, openRouterModel, []);  // Use the state variable
+            const analysis = await analyzeImageWithOpenRouter(imageUrl, openRouterApiKey, openRouterModel, []);
             setAnalysisResult(analysis);
             setMessageHistory([{ role: 'assistant', content: analysis }]);
 
@@ -196,7 +208,14 @@ function App() {
 
         } catch (err) {
             console.error('Error in capture process:', err);
-            setError(`Error: ${err.message}`);
+            // Handle OpenRouter API errors specifically
+            if (err.message.includes('OpenRouter API error')) {
+                setError(
+                    `Error with OpenRouter API: ${err.message}. Please check your API key in the admin panel.`
+                );
+            } else {
+                setError(`Error: ${err.message}`);
+            }
         } finally {
             setLoading(false);
         }
@@ -216,6 +235,11 @@ function App() {
     };
 
     const handleAskQuestion = async () => {
+        if (!openRouterApiKey) {
+            setError("API Key is missing. Please set it in the admin panel.");
+            navigate('/admin');
+            return;
+        }
         if (!userQuestion.trim()) return;
 
         setLoading(true);
@@ -227,7 +251,7 @@ function App() {
         try {
             const response = await analyzeImageWithOpenRouter(
                 imagePreviewUrl,
-                openRouterApiKey, // Use the state variable
+                openRouterApiKey,
                 openRouterModel,
                 updatedMessageHistory
             );
@@ -236,7 +260,13 @@ function App() {
             setUserQuestion('');
         } catch (err) {
             console.error('Error asking question:', err);
-            setError(`Error asking question: ${err.message}`);
+             if (err.message.includes('OpenRouter API error')) {
+                setError(
+                    `Error with OpenRouter API: ${err.message}. Please check your API key in the admin panel.`
+                );
+            } else {
+                setError(`Error asking question: ${err.message}`);
+            }
 
         } finally {
             setLoading(false);
@@ -284,9 +314,12 @@ function App() {
                             Switch Camera ({facingMode === 'user' ? 'Front' : 'Rear'})
                         </button>
                     </div>
-                    <button onClick={handleCapture} disabled={loading || !!error} className="primary-button">
-                        {loading ? 'Processing...' : 'Capture and Analyze'}
-                    </button>
+                    {/* Conditionally render the Capture button */}
+                    {openRouterApiKey && (
+                        <button onClick={handleCapture} disabled={loading || !!error} className="primary-button">
+                            {loading ? 'Processing...' : 'Capture and Analyze'}
+                        </button>
+                    )}
                     {imagePreviewUrl && (
                         <animated.div style={imagePreviewSpring} className="image-preview">
                             <h3>Image Preview</h3>

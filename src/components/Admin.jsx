@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom'; // Import useNavigate
 import './Admin.css';
 
 function Admin() {
@@ -8,9 +8,9 @@ function Admin() {
   const [apiKey, setApiKey] = useState('');
   const [message, setMessage] = useState('');
   const correctPin = '1234';
+    const navigate = useNavigate(); // Get the navigate function
 
   useEffect(() => {
-    // Check for existing API key in localStorage
     const storedApiKey = localStorage.getItem('openRouterApiKey');
     if (storedApiKey) {
       setApiKey(storedApiKey);
@@ -30,7 +30,10 @@ function Admin() {
   const handleApiKeyUpdate = () => {
     localStorage.setItem('openRouterApiKey', apiKey);
     setMessage('API Key updated successfully!');
-    setTimeout(() => setMessage(''), 3000); // Clear message after 3 seconds
+    setTimeout(() => {
+        setMessage('');
+        navigate('/'); // Redirect to home after successful update
+    }, 3000);
   };
 
   if (!isAuthenticated) {
