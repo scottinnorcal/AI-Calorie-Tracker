@@ -114,6 +114,9 @@ label {
     position: relative;
     border-radius: var(--border-radius);
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Center the button */
 }
 
 .video-container video {
@@ -122,17 +125,24 @@ label {
     display: block;
 }
 
+.video-container .secondary-button {
+    margin-top: 10px; /* Space between video and button */
+}
+
 /* Image Preview */
 .image-preview {
     text-align: center;
     margin-top: 20px;
+    width: 100%; /* Make the container take full width */
 }
 
 .image-preview img {
-    max-width: 100%;
-    height: auto;
+    max-width: 90%;  /* Limit image width to 90% of its container */
+    height: auto;     /* Maintain aspect ratio */
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
+    display: block; /* Remove any extra space below the image */
+    margin: 0 auto; /* Center the image horizontally */
 }
 
 /* Loading and Error Messages */
@@ -220,9 +230,9 @@ label {
     margin-top: 15px;
     padding: 15px;
     border-radius: var(--border-radius);
-    background-color: #e9f7ef; /* Light green background */
-    border: 1px solid #28a745; /* Green border */
-    color: #155724; /* Dark green text */
+    background-color: #e9f7ef;
+    border: 1px solid #28a745;
+    color: #155724;
 }
 
 /* Responsive Layout */

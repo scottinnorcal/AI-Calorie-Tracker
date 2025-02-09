@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useSpring, animated } from 'react-spring';
-import { Link, useNavigate } from 'react-router-dom'; // Import useNavigate
+import { Link, useNavigate } from 'react-router-dom';
 import './App.css';
 import MealAnalysisDisplay from './components/MealAnalysisDisplay';
 
 const supabaseUrl = 'https://nouhhtzpulljacpjbwtz.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vdWhodHpwdWxsamFjcGpid3R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzkwNTE4NDksImV4cCI6MjA1NDYyNzg0OX0.mQUupVWxQRMErliyEwD9JFfRCMNz3gbm76rk9l6wdy4';
-const openRouterModel = 'google/gemini-2.0-flash-lite-preview-02-05:free';
+const openRouterModel = 'google/gemini-pro-vision'; // CHANGED MODEL
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -41,7 +41,7 @@ async function analyzeImageWithOpenRouter(imageUrl, apiKey, model, messageHistor
         return data.choices[0].message.content;
     } catch (err) {
         console.error('Error analyzing image:', err);
-        throw err; // Re-throw to handle in calling function
+        throw err;
     }
 }
 
@@ -61,11 +61,11 @@ function App() {
     const [openRouterApiKey, setOpenRouterApiKey] = useState('');
 
     const videoRef = useRef(null);
-    const navigate = useNavigate(); // Get the navigate function
+    const navigate = useNavigate();
 
     const fadeIn = useSpring({ opacity: 1, from: { opacity: 0 }, delay: 200 });
     const imagePreviewSpring = useSpring({
-        transform: imagePreviewUrl ? 'scale(1)' : 'scale(0.8)',
+        transform: imagePreviewUrl ? 'scale(1)' : 'scale(0.9)',
         opacity: imagePreviewUrl ? 1 : 0,
         config: { tension: 180, friction: 12 },
     });
@@ -75,9 +75,8 @@ function App() {
         if (storedApiKey) {
             setOpenRouterApiKey(storedApiKey);
         } else {
-            // Redirect to admin if no API key is found
             navigate('/admin');
-            return; // Stop further execution in this useEffect
+            return;
         }
 
         const fetchMeals = async () => {
@@ -128,14 +127,14 @@ function App() {
                 tracks.forEach((track) => track.stop());
             }
         };
-    }, [facingMode, navigate]); // Add navigate to dependency array
+    }, [facingMode, navigate]);
 
 
 
     const handleCapture = async () => {
         if (!openRouterApiKey) {
             setError("API Key is missing. Please set it in the admin panel.");
-            navigate('/admin'); // Redirect to admin
+            navigate('/admin');
             return;
         }
 
@@ -208,7 +207,6 @@ function App() {
 
         } catch (err) {
             console.error('Error in capture process:', err);
-            // Handle OpenRouter API errors specifically
             if (err.message.includes('OpenRouter API error')) {
                 setError(
                     `Error with OpenRouter API: ${err.message}. Please check your API key in the admin panel.`
@@ -314,7 +312,6 @@ function App() {
                             Switch Camera ({facingMode === 'user' ? 'Front' : 'Rear'})
                         </button>
                     </div>
-                    {/* Conditionally render the Capture button */}
                     {openRouterApiKey && (
                         <button onClick={handleCapture} disabled={loading || !!error} className="primary-button">
                             {loading ? 'Processing...' : 'Capture and Analyze'}
