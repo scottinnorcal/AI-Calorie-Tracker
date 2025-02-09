@@ -34,7 +34,22 @@ import React, { useState, useEffect, useRef } from 'react';
 
                         If no food items are detected, state that no food items were detected.
 
-                        The user's goal is ${userGoal} and the daily calorie goal is ${dailyCaloriesGoal}.`
+                        The user's goal is ${userGoal} and the daily calorie goal is ${dailyCaloriesGoal}.
+
+                        Return the analysis in JSON format. The JSON object should have the following structure:
+
+                        {
+                          "foods": ["food1", "food2", ...],
+                          "totalCalories": "estimated total calories",
+                          "nutrients": {
+                            "protein": "grams of protein",
+                            "carbs": "grams of carbohydrates",
+                            "fat": "grams of fat"
+                          },
+                          "analysisSummary": "A brief summary of the meal's nutritional profile",
+                          "recommendation": "A recommendation based on the user's goal and calorie goal"
+                        }
+                        `
               },
               {
                 type: "image_url",
@@ -67,7 +82,12 @@ import React, { useState, useEffect, useRef } from 'react';
         }
 
         const data = await response.json();
-        return data.choices[0].message.content;
+        try {
+          return JSON.parse(data.choices[0].message.content);
+        } catch (error) {
+          console.error("Failed to parse JSON", data.choices[0].message.content, error);
+          return { analysisSummary: "Failed to parse analysis, please try again." };
+        }
 
       } catch (err) {
         console.error('Error analyzing image:', err);
@@ -196,7 +216,7 @@ import React, { useState, useEffect, useRef } from 'react';
           // Call analyzeImageWithOpenRouter with the base64 data URL
           const analysis = await analyzeImageWithOpenRouter(dataUrl, openRouterApiKey, openRouterModel, [], userGoal, dailyCaloriesGoal);
           setAnalysisResult(analysis);
-          setMessageHistory([{ role: 'assistant', content: analysis }]);
+          setMessageHistory([{ role: 'assistant', content: JSON.stringify(analysis) }]);
 
           if (ateMeal) {
             const now = new Date();
@@ -205,7 +225,7 @@ import React, { useState, useEffect, useRef } from 'react';
             const { error: insertError } = await supabase.from('meals').insert([
               {
                 image_url: dataUrl, // Store base64 image data
-                analysis: analysis,
+                analysis: JSON.stringify(analysis),
                 user_goal: userGoal,
                 daily_calories_goal: dailyCaloriesGoal,
                 created_at: timestamp, // Add local timestamp
@@ -352,7 +372,7 @@ import React, { useState, useEffect, useRef } from 'react';
               userGoal,
               dailyCaloriesGoal
             );
-            setMessageHistory([...updatedMessageHistory, { role: 'assistant', content: response }]);
+            setMessageHistory([...updatedMessageHistory, { role: 'assistant', content: JSON.stringify(response) }]);
           }
           setUserQuestion('');
         } catch (err) {
@@ -581,7 +601,7 @@ import React, { useState, useEffect, useRef } from 'react';
               {error && <p className="error-message">Error: {error}</p>}
               {analysisResult && (
                 <>
-                  <p>{analysisResult}</p>
+                  <MealAnalysisDisplay analysis={analysisResult} />
                   <div className="recommendation">
                     <strong>Recommendation:</strong> {recommendation}
                   </div>
@@ -628,7 +648,7 @@ import React, { useState, useEffect, useRef } from 'react';
                       <p>{meal.analysis}</p>
                       <p><strong>User Goal:</strong> {meal.user_goal}</p>
                       <p><strong>Daily Calorie Goal:</strong> {meal.daily_calories_goal}</p>
-                      <p><strong>Time:</strong> {meal.created_at}</p> {/* Display timestamp */}
+                      <p><strong>Time:</strong> {new Date(meal.created_at).toLocaleDateString()} {new Date(meal.created_at).toLocaleTimeString()}</p>
                     </div>
                     <button onClick={() => handleDeleteMeal(meal.id)} className="secondary-button">
                       Delete
