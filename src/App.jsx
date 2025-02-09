@@ -4,6 +4,7 @@ import { useSpring, animated } from 'react-spring';
 import { Link, useNavigate } from 'react-router-dom';
 import './App.css';
 import MealAnalysisDisplay from './components/MealAnalysisDisplay';
+import Auth from './components/Auth';
 
 const supabaseUrl = 'https://nouhhtzpulljacpjbwtz.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vdWhodHpwdWxsamFjcGpid3R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzkwNTE4NDksImV4cCI6MjA1NDYyNzg0OX0.mQUupVWxQRMErliyEwD9JFfRCMNz3gbm76rk9l6wdy4';
@@ -113,6 +114,7 @@ function App() {
     const [isTyping, setIsTyping] = useState(false);
     const [facingMode, setFacingMode] = useState('user');
     const [openRouterApiKey, setOpenRouterApiKey] = useState('');
+    const [session, setSession] = useState(null);
 
     const videoRef = useRef(null);
     const navigate = useNavigate();
@@ -125,6 +127,15 @@ function App() {
     });
 
     useEffect(() => {
+        supabase.auth.getSession()
+            .then(({ data: { session } }) => {
+                setSession(session);
+            });
+
+        supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+        });
+
         const storedApiKey = localStorage.getItem('openRouterApiKey');
         if (storedApiKey) {
             setOpenRouterApiKey(storedApiKey);
@@ -352,6 +363,10 @@ function App() {
     const toggleFacingMode = () => {
         setFacingMode(prevMode => (prevMode === 'user' ? 'environment' : 'user'));
     };
+
+    if (!session) {
+        return <Auth />;
+    }
 
 
     return (
